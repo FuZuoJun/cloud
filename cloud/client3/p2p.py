@@ -201,14 +201,14 @@ if __name__ == '__main__':
     name = os.path.basename(os.getcwd())
 
     if name == "client1":
-        ip, port = "127.0.0.1", 8001
-        peers = [("127.0.0.1", 8002), ("127.0.0.1", 8003)]
+        ip, port = "172.17.0.2", 8001
+        peers = [("172.17.0.3", 8002), ("172.17.0.4", 8003)]
     elif name == "client2":
-        ip, port = "127.0.0.1", 8002
-        peers = [("127.0.0.1", 8001), ("127.0.0.1", 8003)]
+        ip, port = "172.17.0.3", 8002
+        peers = [("172.17.0.2", 8001), ("172.17.0.4", 8003)]
     elif name == "client3":
-        ip, port = "127.0.0.1", 8003
-        peers = [("127.0.0.1", 8001), ("127.0.0.1", 8002)]
+        ip, port = "172.17.0.4", 8003
+        peers = [("172.17.0.2", 8001), ("172.17.0.3", 8002)]
     else:
         print("[ERROR] Please run this script inside client1, client2, or client3 folder.")
         sys.exit(1)
