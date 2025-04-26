@@ -297,7 +297,7 @@ if __name__ == '__main__':
         sys.exit(1)
 
     name = PORTS[port]
-    ip = "127.0.0.1"
+    ip = "172.17.0.2"
     peers = PEERS[port]
 
     node = P2PNode(name, ip, port, peers)
