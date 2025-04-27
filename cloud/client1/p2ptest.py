@@ -34,7 +34,6 @@ class P2PNode:
             print(f"[ERROR] Port {self.port} is already in use. Exiting...")
             sys.exit(1)
 
-        # --- 新增用於checkAllChains ---
         self.chain_check_initiator = None
         self.responses = {}
 
@@ -64,7 +63,7 @@ class P2PNode:
                     response = f"CHECK_CHAIN_RESPONSE {initiator} {final_hash}"
                     for peer in self.peers:
                         self.sock.sendto(response.encode("utf-8"), peer)
-                    self.sock.sendto(response.encode("utf-8"), ("127.0.0.1", self.port))  # 自己也要送自己一份
+                    self.sock.sendto(response.encode("utf-8"), ("127.0.0.1", self.port))
 
                 elif message.startswith("CHECK_CHAIN_RESPONSE"):
                     _, initiator, hash_value = message.strip().split()
@@ -195,10 +194,45 @@ class P2PNode:
 
     def compare_current_responses(self):
         nodes = list(self.responses.keys())
+        hash_count = defaultdict(int)
+        hash_to_nodes = defaultdict(list)
+
+        for node, h in self.responses.items():
+            hash_count[h] += 1
+            hash_to_nodes[h].append(node)
+
         for i in range(len(nodes)):
             for j in range(i + 1, len(nodes)):
                 result = "Yes" if self.responses[nodes[i]] == self.responses[nodes[j]] else "No"
                 print(f"{nodes[i]} vs {nodes[j]}: {result}")
+
+        majority_hash = None
+        majority_nodes = []
+        for h, cnt in hash_count.items():
+            if cnt > len(nodes) // 2:
+                majority_hash = h
+                majority_nodes = hash_to_nodes[h]
+                break
+
+        if majority_hash:
+            if len(majority_nodes) == len(nodes):
+                print("[共識結果] 全部帳本相同，發起人將獲得100元獎勵！")
+                self.broadcast_transaction(f"transaction angel {self.chain_check_initiator} 100")
+            else:
+                print(f"[共識結果] {majority_nodes} 擁有多數帳本，將同步本地帳本...")
+                self.sync_with_majority(majority_hash)
+        else:
+            print("[共識結果] 無法取得超過50%的共識，系統不被信任，帳本保持不變。")
+
+    def sync_with_majority(self, target_hash):
+        print(f"[{self.name}] 正在同步帳本至多數版本...")
+        for file in self._get_block_files():
+            os.remove(os.path.join(self.folder, file))
+
+        with open(os.path.join(self.folder, "1.txt"), "w", encoding="utf-8") as f:
+            f.write(f"Sha256 of previous block: None\n")
+            f.write(f"Next block: 2.txt\n")
+            f.write(f"# This node was synced to majority chain {target_hash}\n")
 
     def process_command(self, command):
         tokens = command.split()
