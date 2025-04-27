@@ -69,14 +69,6 @@ class P2PNode:
             else:
                 print(f"Received unknown message: {msg}")
 
-    def _send_full_chain(self, addr):
-        files = sorted([f for f in os.listdir('.') if f.endswith('.txt') and f[:-4].isdigit()], key=lambda x: int(x[:-4]))
-        for fname in files:
-            with open(fname, 'r', encoding='utf-8') as f:
-                content = f.read()
-                msg = f"CHAIN:{fname}\n{content}"
-                self.sock.sendto(msg.encode('utf-8'), addr)
-
     def _command_interface(self):
         while True:
             cmd_line = input("Enter a command (checkMoney, checkLog, transaction, checkChain, checkAllChains, exit): ").strip()
@@ -201,49 +193,60 @@ class P2PNode:
     def _compare_hashes(self):
         nodes = list(self.received_chains.keys())
         comparison_results = []
+        match_matrix = {}
+
         for i in range(len(nodes)):
             for j in range(i + 1, len(nodes)):
                 if self.received_chains[nodes[i]] == self.received_chains[nodes[j]]:
                     comparison_results.append(f"{nodes[i]} vs {nodes[j]} : Yes")
+                    match_matrix[(nodes[i], nodes[j])] = True
                 else:
                     comparison_results.append(f"{nodes[i]} vs {nodes[j]} : No")
+                    match_matrix[(nodes[i], nodes[j])] = False
+
         for result in comparison_results:
             print(result)
 
-    def _consensus_result(self):
+        return match_matrix
+
+    def _overwrite_chain(self, new_chain_contents):
+        files = sorted([f for f in os.listdir('.') if f.endswith('.txt') and f[:-4].isdigit()], key=lambda x: int(x[:-4]))
+        for f in files:
+            os.remove(f)
+        for idx, content in enumerate(new_chain_contents):
+            filename = f"{idx+1}.txt"
+            with open(filename, 'w', encoding='utf-8') as f:
+                f.write(content)
+        self.blockchain.load_from_files()
+
+    def _consensus_result(self, match_matrix):
         all_chains = self.received_chains
         if len(all_chains) <= 1:
             return False
 
-        chain_lengths = [len(chain) for chain in all_chains.values()]
-        max_len = max(chain_lengths)
+        content_count = {}
+        for chain in all_chains.values():
+            chain_tuple = tuple(chain)
+            content_count[chain_tuple] = content_count.get(chain_tuple, 0) + 1
 
-        majority_found = False
+        majority_chain = None
+        majority_count = 0
+        for chain, count in content_count.items():
+            if count > majority_count:
+                majority_count = count
+                majority_chain = chain
 
-        for idx in range(max_len):
-            block_versions = {}
-            for chain in all_chains.values():
-                if idx < len(chain):
-                    content = chain[idx]
-                    block_versions[content] = block_versions.get(content, 0) + 1
+        if majority_count == len(all_chains):
+            print("所有客戶的帳本完全一致!")
+            return True
 
-            majority_block = None
-            for content, count in block_versions.items():
-                if count > len(all_chains) // 2:
-                    majority_block = content
-                    break
+        if majority_count > len(all_chains) // 2:
+            print("發現不一致帳本，已用較可信之帳本覆蓋!")
+            self._overwrite_chain(list(majority_chain))
+            return True
 
-            if majority_block is not None:
-                majority_found = True
-                print("找到多數一致帳本，正在覆蓋")
-                self._sync_block(idx, majority_block)
-                sync_msg = {"type": "SYNC_BLOCK", "index": idx, "content": majority_block}
-                for peer in self.peers:
-                    self.sock.sendto(json.dumps(sync_msg).encode('utf-8'), peer)
-
-        if not majority_found:
-            print("找不到多數一致帳本，系統不被信任")
-        return majority_found
+        print("找不到多數一致帳本，系統不被信任!")
+        return False
 
     def _sync_block(self, index, content):
         filename = f"{index+1}.txt"
@@ -263,9 +266,9 @@ class P2PNode:
         print("Waiting for nodes to reply...")
         time.sleep(5)
 
-        self._compare_hashes()
+        match_matrix = self._compare_hashes()
 
-        if self._consensus_result():
+        if self._consensus_result(match_matrix):
             angel_tx = f"angel, {checker}, 100"
             self._add_reward_and_broadcast(angel_tx)
         else:
