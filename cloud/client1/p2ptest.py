@@ -269,6 +269,7 @@ class P2PNode:
         self.received_chains[self.self_ip] = self._gather_blockchain_contents()
 
         print("等待其他客戶的回應:")
+        time.sleep(3)
 
         match_matrix = self._compare_hashes()
 
