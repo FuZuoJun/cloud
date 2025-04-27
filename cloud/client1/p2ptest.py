@@ -96,7 +96,7 @@ class P2PNode:
                 print("Bye!")
                 os._exit(0)
             else:
-                print("Unknown or malformed command.")
+                print("未知指令，請再試一次")
 
     def _check_money(self, user):
         balances = {}
