@@ -113,13 +113,18 @@ class P2PNode:
     def _check_log(self, user):
         found = False
         for i, block in enumerate(self.blockchain.blocks):
+            relevant_txs = []
             for tx in block.transactions:
                 parts = tx.split(', ')
                 if len(parts) == 3:
                     sender, receiver, amount = parts[0], parts[1], parts[2]
                     if sender == user or receiver == user:
-                        print(f"[Block {i+1}.txt]: {sender} → {receiver} : {amount}")
+                        relevant_txs.append(f"{sender} → {receiver} : {amount}")
                         found = True
+            if relevant_txs:
+                print(f"-----{i+1}.txt-----")
+                for line in relevant_txs:
+                    print(line)
         if not found:
             print(f"{user} 無任何交易紀錄!")
 
@@ -255,7 +260,7 @@ class P2PNode:
         self.blockchain.load_from_files()
 
     def _check_all_chains(self, checker):
-        print(f"Starting checkAllChains by {checker}...")
+        print(f"{checker}正在執行checkAllChains")
 
         msg = f"CHECK_ALL_REQUEST:{checker}"
         for peer in self.peers:
@@ -263,8 +268,7 @@ class P2PNode:
 
         self.received_chains[self.self_ip] = self._gather_blockchain_contents()
 
-        print("Waiting for nodes to reply...")
-        time.sleep(5)
+        print("等待其他客戶的回應:")
 
         match_matrix = self._compare_hashes()
 
