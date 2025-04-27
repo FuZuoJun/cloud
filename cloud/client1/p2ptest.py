@@ -34,6 +34,10 @@ class P2PNode:
             print(f"[ERROR] Port {self.port} is already in use. Exiting...")
             sys.exit(1)
 
+        # --- 新增用於checkAllChains ---
+        self.chain_check_initiator = None
+        self.responses = {}
+
     def start(self):
         threading.Thread(target=self._listen, daemon=True).start()
 
@@ -49,14 +53,32 @@ class P2PNode:
             try:
                 data, addr = self.sock.recvfrom(2048)
                 message = data.decode("utf-8")
+
                 if message.startswith("transaction"):
                     self.append_to_ledger(message)
                     print(f"[{self.name}] 收到廣播訊息: {message}")
+
+                elif message.startswith("CHECK_CHAIN_REQUEST"):
+                    _, initiator = message.strip().split()
+                    final_hash = self.check_chain_and_return_hash()
+                    response = f"CHECK_CHAIN_RESPONSE {initiator} {final_hash}"
+                    for peer in self.peers:
+                        self.sock.sendto(response.encode("utf-8"), peer)
+                    self.sock.sendto(response.encode("utf-8"), ("127.0.0.1", self.port))  # 自己也要送自己一份
+
+                elif message.startswith("CHECK_CHAIN_RESPONSE"):
+                    _, initiator, hash_value = message.strip().split()
+                    if self.chain_check_initiator == initiator:
+                        sender_ip = addr[0]
+                        self.responses[IPS[sender_ip]] = hash_value
+                        self.compare_current_responses()
+
                 elif message.strip() == "get_last_hash":
                     last_file = self._get_block_files()[-1] if self._get_block_files() else None
                     if last_file:
                         hash_val = self.compute_sha256(os.path.join(self.folder, last_file))
                         self.sock.sendto(hash_val.encode("utf-8"), addr)
+
             except ConnectionResetError:
                 print(f"[{self.name}] Warning: one of the peers forcibly closed the connection.")
             except Exception as e:
@@ -159,93 +181,24 @@ class P2PNode:
                     print(f"[錯誤] 區塊鏈損壞，遭竄改的可能是檔案：{files[i - 1]}")
                     return False
 
-        last_file = os.path.join(self.folder, files[-1])
-        try:
-            with open(last_file, "r", encoding="utf-8") as f:
-                content = f.read()
-                recalculated = hashlib.sha256(content.encode()).hexdigest()
-                expected = self.compute_sha256(last_file)
-                if recalculated != expected:
-                    print(f"[錯誤] 最後一個區塊內容遭竄改：{files[-1]}")
-                    return False
-        except Exception as e:
-            print(f"[錯誤] 檢查最後區塊失敗：{e}")
-            return False
-
         return True
 
-    def check_all_chain(self, account):
-        print("[檢查] 開始帳本一致性驗證...")
-        all_hashes = self.gather_all_chain_hashes()
-        self.compare_chains(all_hashes)
-        local_chain = tuple(self.compute_chain_hashes(self.folder))
-        majority_chain, majority_nodes = self.majority_chain_group(all_hashes)
+    def check_chain_and_return_hash(self):
+        if not self.verify_chain():
+            print(f"[{self.name}] 本地帳本檢查失敗")
+            return "ERROR"
 
-        if not majority_chain:
-            print("[結果] ❌ 無法取得多數一致帳本，系統不可信任")
-            return
+        last_file = self._get_block_files()[-1] if self._get_block_files() else None
+        if last_file:
+            return self.compute_sha256(os.path.join(self.folder, last_file))
+        return "EMPTY"
 
-        if local_chain != majority_chain:
-            print("[結果] ⚠️ 發現與多數帳本不一致，將進行覆蓋")
-            for node in majority_nodes:
-                if IPS[self.ip] != node:
-                    self.replace_local_ledger(f"../{node}")
-                    break
-        else:
-            print("[結果] ✅ 本地帳本已與多數一致")
-
-        if tuple(self.compute_chain_hashes(self.folder)) in majority_chain:
-            print("[驗證成功] 本地鏈結正確，發放獎勵100元")
-            self.broadcast_transaction(f"transaction angel {account} 100")
-        else:
-            print("[錯誤] 本地帳本鏈結與任一節點不一致，疑似被竄改")
-
-    def compute_chain_hashes(self, folder):
-        return [self.compute_sha256(os.path.join(folder, file)) for file in self._get_block_files()]
-
-    def gather_all_chain_hashes(self):
-        result = {}
-        for ip, name in IPS.items():
-            path = f"../{name}"
-            if os.path.exists(path):
-                result[name] = tuple(self.compute_sha256(os.path.join(path, file)) for file in self._get_block_files_from(path))
-            else:
-                result[name] = ()
-        return result
-
-    def _get_block_files_from(self, folder):
-        return sorted([
-            f for f in os.listdir(folder)
-            if f.endswith(".txt") and f[:-4].isdigit()
-        ], key=lambda x: int(x[:-4]))
-
-    def majority_chain_group(self, chain_hashes):
-        group = defaultdict(list)
-        for node, chash in chain_hashes.items():
-            group[chash].append(node)
-        for chain, nodes in group.items():
-            if len(nodes) > len(chain_hashes) / 2:
-                return chain, nodes
-        return None, []
-
-    def compare_chains(self, chain_hashes):
-        print("\n帳本鏈內容比對結果：")
-        nodes = list(chain_hashes.keys())
+    def compare_current_responses(self):
+        nodes = list(self.responses.keys())
         for i in range(len(nodes)):
             for j in range(i + 1, len(nodes)):
-                result = "Yes" if chain_hashes[nodes[i]] == chain_hashes[nodes[j]] else "No"
+                result = "Yes" if self.responses[nodes[i]] == self.responses[nodes[j]] else "No"
                 print(f"{nodes[i]} vs {nodes[j]}: {result}")
-        print("----")
-
-    def replace_local_ledger(self, from_dir):
-        print("[動作] 清除本地帳本並複製較可信之帳本")
-        for file in os.listdir(self.folder):
-            if file.endswith(".txt"):
-                os.remove(os.path.join(self.folder, file))
-        for file in os.listdir(from_dir):
-            if file.endswith(".txt"):
-                shutil.copy(os.path.join(from_dir, file), os.path.join(self.folder, file))
-        print("[完成] 本地帳本已成功覆蓋!")
 
     def process_command(self, command):
         tokens = command.split()
@@ -258,16 +211,19 @@ class P2PNode:
                 print("Usage: transaction A B 10")
                 return
             self.broadcast_transaction(command)
+
         elif cmd == "checkMoney":
             if len(tokens) != 2:
                 print("Usage: checkMoney A")
                 return
             print(f"{tokens[1]} has ${self.get_balance(tokens[1])}")
+
         elif cmd == "checkLog":
             if len(tokens) != 2:
                 print("Usage: checkLog A")
                 return
             self.print_ledger(tokens[1])
+
         elif cmd == "checkChain":
             if len(tokens) != 2:
                 print("Usage: checkChain A")
@@ -275,11 +231,18 @@ class P2PNode:
             if self.verify_chain():
                 print(f"帳本鍊未有錯誤，{tokens[1]}獲得$10獎勵")
                 self.broadcast_transaction(f"transaction angel {tokens[1]} 10")
-        elif cmd == "checkAllChain":
+
+        elif cmd == "checkAllChain" or cmd == "checkAllChains":
             if len(tokens) != 2:
-                print("Usage: checkAllChain A")
+                print("Usage: checkAllChains A")
                 return
-            self.check_all_chain(tokens[1])
+            self.chain_check_initiator = tokens[1]
+            self.responses = {IPS[self.ip]: self.check_chain_and_return_hash()}
+            broadcast_message = f"CHECK_CHAIN_REQUEST {tokens[1]}"
+            for peer in self.peers:
+                self.sock.sendto(broadcast_message.encode("utf-8"), peer)
+            print(f"[{self.name}] 廣播發起checkAllChains...")
+
         elif cmd == "exit":
             print("Bye!")
             sys.exit(0)
