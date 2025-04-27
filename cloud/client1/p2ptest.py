@@ -29,7 +29,7 @@ class P2PNode:
 
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         try:
-            self.sock.bind((self.ip, self.port))
+            self.sock.bind(("0.0.0.0", self.port))
         except OSError:
             print(f"[ERROR] Port {self.port} is already in use. Exiting...")
             sys.exit(1)
