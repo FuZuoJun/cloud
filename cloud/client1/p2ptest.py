@@ -79,7 +79,7 @@ class P2PNode:
 
     def _command_interface(self):
         while True:
-            cmd_line = input("Enter a command (checkMoney, checkLog, transaction, checkChain, checkAllChains): ").strip()
+            cmd_line = input("Enter a command (checkMoney, checkLog, transaction, checkChain, checkAllChains, exit): ").strip()
             parts = cmd_line.split()
             if not parts:
                 continue
@@ -100,6 +100,9 @@ class P2PNode:
                 self._check_chain(parts[1])
             elif cmd == "checkAllChains" and len(parts) == 2:
                 self._check_all_chains(parts[1])
+            elif cmd == "exit":
+                print("Bye!")
+                os._exit(0)
             else:
                 print("Unknown or malformed command.")
 
@@ -207,14 +210,15 @@ class P2PNode:
         for result in comparison_results:
             print(result)
 
-    def _consensus(self):
+    def _consensus_result(self):
         all_chains = self.received_chains
         if len(all_chains) <= 1:
-            return
+            return False
 
         chain_lengths = [len(chain) for chain in all_chains.values()]
         max_len = max(chain_lengths)
-        consensus_blocks = {}
+
+        majority_found = False
 
         for idx in range(max_len):
             block_versions = {}
@@ -230,17 +234,22 @@ class P2PNode:
                     break
 
             if majority_block is not None:
+                majority_found = True
+                print("找到多數一致帳本，正在覆蓋")
                 self._sync_block(idx, majority_block)
                 sync_msg = {"type": "SYNC_BLOCK", "index": idx, "content": majority_block}
                 for peer in self.peers:
                     self.sock.sendto(json.dumps(sync_msg).encode('utf-8'), peer)
+
+        if not majority_found:
+            print("找不到多數一致帳本，系統不被信任")
+        return majority_found
 
     def _sync_block(self, index, content):
         filename = f"{index+1}.txt"
         with open(filename, 'w', encoding='utf-8') as f:
             f.write(content)
         self.blockchain.load_from_files()
-        print(f"Block {index+1}同步完成。")
 
     def _check_all_chains(self, checker):
         print(f"Starting checkAllChains by {checker}...")
@@ -255,10 +264,12 @@ class P2PNode:
         time.sleep(5)
 
         self._compare_hashes()
-        self._consensus()
 
-        angel_tx = f"angel, {checker}, 100"
-        self._add_reward_and_broadcast(angel_tx)
+        if self._consensus_result():
+            angel_tx = f"angel, {checker}, 100"
+            self._add_reward_and_broadcast(angel_tx)
+        else:
+            print(f"{checker} 不給予100元獎勵。")
 
 if __name__ == '__main__':
     if len(sys.argv) != 2:
