@@ -70,7 +70,11 @@ class P2PNode:
                     if self.chain_check_initiator == initiator:
                         sender_ip = addr[0]
                         self.responses[IPS[sender_ip]] = hash_value
-                        self.compare_current_responses()
+
+                        # 等到所有節點回應完再進行共識
+                        expected_num_responses = len(self.peers) + 1
+                        if len(self.responses) == expected_num_responses:
+                            self.compare_current_responses()
 
                 elif message.strip() == "get_last_hash":
                     last_file = self._get_block_files()[-1] if self._get_block_files() else None
