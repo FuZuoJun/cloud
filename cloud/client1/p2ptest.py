@@ -29,7 +29,7 @@ class P2PNode:
 
             if msg.startswith("CHECK_ALL_REQUEST:"):
                 sender = msg.split(":")[1]
-                print(f"Received checkAllChains request from {sender}")
+                print(f"收到來自 {sender} 的checkAllChains請求")
                 chain_data = self._gather_blockchain_contents()
                 reply = {"type": "CHAIN_DATA", "ip": self.self_ip, "chain": chain_data}
                 for peer in self.peers:
@@ -50,7 +50,7 @@ class P2PNode:
 
             elif msg.startswith("TRANSACTION_BROADCAST: "):
                 tx = msg.replace("TRANSACTION_BROADCAST: ", "").strip()
-                print(f"Received broadcast transaction: {tx}")
+                print(f"收到交易紀錄的廣播: {tx}")
                 if not self.blockchain.blocks or len(self.blockchain.blocks[-1].transactions) >= 5:
                     self.blockchain.add_block([tx])
                 else:
@@ -59,7 +59,7 @@ class P2PNode:
 
             elif msg.startswith("REWARD_BROADCAST: "):
                 reward_tx = msg.replace("REWARD_BROADCAST: ", "").strip()
-                print(f"Received reward broadcast: {reward_tx}")
+                print(f"收到獎勵的廣播: {reward_tx}")
                 if not self.blockchain.blocks or len(self.blockchain.blocks[-1].transactions) >= 5:
                     self.blockchain.add_block([reward_tx])
                 else:
@@ -67,7 +67,7 @@ class P2PNode:
                 self.blockchain.save_new_block_to_file(self.blockchain.blocks[-1])
 
             else:
-                print(f"Received unknown message: {msg}")
+                print(f"收到未知消息: {msg}")
 
     def _command_interface(self):
         while True:
@@ -87,13 +87,13 @@ class P2PNode:
                     amount = int(parts[3])
                     self._transaction(sender, receiver, amount)
                 except ValueError:
-                    print("Invalid amount. Please enter a number.")
+                    print("請輸入有效數字金額.")
             elif cmd == "checkChain" and len(parts) == 2:
                 self._check_chain(parts[1])
             elif cmd == "checkAllChains" and len(parts) == 2:
                 self._check_all_chains(parts[1])
             elif cmd == "exit":
-                print("Bye!")
+                print("感謝你的使用~")
                 os._exit(0)
             else:
                 print("未知指令，請再試一次")
@@ -108,7 +108,7 @@ class P2PNode:
                     if s != "angel":
                         balances[s] = balances.get(s, 0) - a
                     balances[r] = balances.get(r, 0) + a
-        print(f"{user}: {balances.get(user, 0)}")
+        print(f"{user}的餘額 ${balances.get(user, 0)}")
 
     def _check_log(self, user):
         found = False
@@ -121,7 +121,7 @@ class P2PNode:
                         print(f"[Block {i+1}.txt]: {sender} → {receiver} : {amount}")
                         found = True
         if not found:
-            print(f"{user} No transaction!")
+            print(f"{user} 無任何交易紀錄!")
 
     def _transaction(self, sender, receiver, amount):
         balances = {}
@@ -135,7 +135,7 @@ class P2PNode:
                     balances[r] = balances.get(r, 0) + a
 
         if sender != "angel" and balances.get(sender, 0) < amount:
-            print(f"Transaction failed: {sender}, Not enough amount: {balances.get(sender, 0)}")
+            print(f"交易失敗: {sender}, 餘額不足: {balances.get(sender, 0)}")
             return
 
         transaction = f"{sender}, {receiver}, {amount}"
@@ -147,7 +147,7 @@ class P2PNode:
             block_index = len(self.blockchain.blocks)
 
         self.blockchain.save_new_block_to_file(self.blockchain.blocks[-1])
-        print(f"Transaction success, written in {block_index}.txt")
+        print(f"交易成功且記錄於{block_index}.txt")
 
         for peer in self.peers:
             tx_data = f"TRANSACTION_BROADCAST: {transaction}"
@@ -159,7 +159,7 @@ class P2PNode:
                 prev_block = blockchain.blocks[i - 1]
                 current_block = blockchain.blocks[i]
                 if current_block.previous_hash != prev_block.hash:
-                    print(f"Mismatch at block {i+1}: expected {prev_block.hash}, got {current_block.previous_hash}")
+                    print(f"帳本練受損於{i+1}.txt")
                     return i + 1
             return 0
 
@@ -169,7 +169,7 @@ class P2PNode:
             angel_tx = f"angel, {checker}, 10"
             self._add_reward_and_broadcast(angel_tx)
         else:
-            print(f"帳本鍊受損，不給予獎勵")
+            print(f"帳本鍊受損，不給予10元獎勵")
 
     def _add_reward_and_broadcast(self, reward_tx):
         if not self.blockchain.blocks or len(self.blockchain.blocks[-1].transactions) >= 5:
@@ -177,7 +177,7 @@ class P2PNode:
         else:
             self.blockchain.blocks[-1].transactions.append(reward_tx)
         self.blockchain.save_new_block_to_file(self.blockchain.blocks[-1])
-        print(f"Reward transaction written: {reward_tx}")
+        print(f"獎勵已發送: {reward_tx}")
         for peer in self.peers:
             msg = f"REWARD_BROADCAST: {reward_tx}"
             self.sock.sendto(msg.encode('utf-8'), peer)
