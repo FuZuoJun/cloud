@@ -5,7 +5,7 @@ class Block:
     def __init__(self, transactions, previous_hash, next_block=None):
         self.transactions = transactions
         self.previous_hash = previous_hash.strip()
-        self.hash = None  # 初始為 None，等區塊寫入檔案後再用檔案內容計算
+        self.hash = None
         self.next_block = next_block
 
     def calculate_hash_from_file(self, filepath):
@@ -67,6 +67,5 @@ class Blockchain:
                 prev_block = block
                 i += 1
 
-    # 🔥 加這個就可以讓p2p.py找得到 calculate_hash
     def calculate_hash(self, content):
         return hashlib.sha256(content.encode()).hexdigest()
