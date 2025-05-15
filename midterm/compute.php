@@ -13,14 +13,14 @@ foreach ($jobs as $metaFile) {
     echo "任務 ID：{$meta['jobId']}\n";
     echo "狀態：{$meta['status']} | 指派節點：{$meta['assigned_node']}\n";
 
-    if ($meta['status'] === 'queued' && $meta['assigned_node'] === $node) {
+    if ($meta['status'] === '排隊中' && $meta['assigned_node'] === $node) {
         echo "✅ 進入處理任務 {$meta['jobId']}\n";
 
         // 將狀態改為 working 並寫入
-        $meta['status'] = 'working';
+        $meta['status'] = '執行中';
         file_put_contents($metaFile, json_encode($meta, JSON_UNESCAPED_UNICODE));
-        echo "🔄 狀態已改為 working，暫停 3 秒供 jobManager 顯示\n";
-        sleep(10); // 等待 3 秒讓 jobManager 有時間讀到 working 狀態
+        echo "🔄 狀態已改為 working，暫停 12 秒供 jobManager 顯示\n";
+        sleep(12);
 
         $filepath = $jobDir . $meta['filename'];
         if (!file_exists($filepath)) {
@@ -38,7 +38,7 @@ foreach ($jobs as $metaFile) {
 
         file_put_contents($resultDir . $meta['jobId'] . ".txt", $result);
 
-        $meta['status'] = 'done';
+        $meta['status'] = '執行完成';
         file_put_contents($metaFile, json_encode($meta, JSON_UNESCAPED_UNICODE));
 
         echo "✅ 任務完成，結果已寫入。\n";
