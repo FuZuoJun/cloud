@@ -1,5 +1,5 @@
 <?php
-$node = "computingNode1"; // 手動指定節點名稱
+$node = "computingNode1"; // 手動指定節點名稱（依據節點自行修改）
 
 echo "目前節點：$node\n";
 
@@ -16,6 +16,10 @@ foreach ($jobs as $metaFile) {
     if ($meta['status'] === 'queued' && $meta['assigned_node'] === $node) {
         echo "✅ 進入處理任務 {$meta['jobId']}\n";
 
+        // 將狀態更新為 working
+        $meta['status'] = 'working';
+        file_put_contents($metaFile, json_encode($meta, JSON_UNESCAPED_UNICODE));
+
         $filepath = $jobDir . $meta['filename'];
         if (!file_exists($filepath)) {
             echo "❌ 找不到檔案：$filepath\n";
@@ -31,6 +35,8 @@ foreach ($jobs as $metaFile) {
         }
 
         file_put_contents($resultDir . $meta['jobId'] . ".txt", $result);
+
+        // 最後將狀態更新為 done
         $meta['status'] = 'done';
         file_put_contents($metaFile, json_encode($meta, JSON_UNESCAPED_UNICODE));
         echo "✅ 任務完成，結果已寫入。\n";
