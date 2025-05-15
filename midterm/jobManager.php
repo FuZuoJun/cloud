@@ -7,8 +7,9 @@ echo "<table border='1'><tr><th>任務ID</th><th>狀態</th><th>節點</th><th>�
 
 foreach ($results as $metaFile) {
     $meta = json_decode(file_get_contents($metaFile), true);
-    echo "<tr><td>{$meta['jobId']}</td><td>{$meta['status']}</td><td>{$meta['assigned_node']}</td><td>";
-    if ($meta['status'] === 'queued') {
+    $statusText = $meta['status']; // 已經是中文狀態
+    echo "<tr><td>{$meta['jobId']}</td><td>$statusText</td><td>{$meta['assigned_node']}</td><td>";
+    if ($meta['status'] === '排隊中') {
         echo "<form method='post'><input type='hidden' name='delete' value='{$meta['jobId']}'><input type='submit' value='刪除'></form>";
     }
     echo "</td></tr>";
