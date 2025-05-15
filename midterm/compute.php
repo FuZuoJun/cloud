@@ -33,7 +33,7 @@ foreach ($jobs as $metaFile) {
 
         foreach ($meta['keywords'] as $keyword) {
             $count = substr_count($text, $keyword);
-            $result .= "關鍵字「$keyword」出現次數：$count\n";
+            $result .= "關鍵字 $keyword 出現次數：$count\n";
         }
 
         file_put_contents($resultDir . $meta['jobId'] . ".txt", $result);
