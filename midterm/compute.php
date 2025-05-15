@@ -1,5 +1,6 @@
 <?php
-$node = gethostname();
+$node = "computingNode1"; // 手動指定節點名稱
+
 echo "目前節點：$node\n";
 
 $jobDir = "/share/jobs/";
@@ -22,11 +23,11 @@ foreach ($jobs as $metaFile) {
         }
 
         $text = file_get_contents($filepath);
-        $result = "任務由 $node 執行\\n";
+        $result = "任務由 $node 執行\n";
 
         foreach ($meta['keywords'] as $keyword) {
             $count = substr_count($text, $keyword);
-            $result .= "🔍 關鍵字「$keyword」出現次數：$count\\n";
+            $result .= "🔍 關鍵字「$keyword」出現次數：$count\n";
         }
 
         file_put_contents($resultDir . $meta['jobId'] . ".txt", $result);
