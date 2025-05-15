@@ -34,3 +34,9 @@ foreach ($nodes as $node) {
     }
 }
 ?>
+
+<script>
+setTimeout(() => {
+  location.reload();
+}, 2000); // 每 2 秒自動刷新一次頁面
+</script>
