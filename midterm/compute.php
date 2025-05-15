@@ -1,5 +1,5 @@
 <?php
-$node = "computingNode2"; // 手動指定節點名稱
+$node = "computingNode3"; // 手動指定節點名稱
 
 echo "目前節點：$node\n";
 
