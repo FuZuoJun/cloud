@@ -23,7 +23,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     $meta = [
         "jobId" => $jobId,
-        "status" => "queued",
+        "status" => "排隊中", // 使用中文狀態
         "assigned_node" => $assigned_node,
         "filename" => $filename,
         "keywords" => $keywords
